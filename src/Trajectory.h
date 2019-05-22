@@ -41,7 +41,6 @@ public:
 			int target_lane, double target_velocity);
 
 	vector<vector<double>> build_trajectory_JMT(
-			vector<double> prev_x, vector<double> prev_y,
 			vector<double> prev_v_x, vector<double> prev_v_y,
 			vector<double> prev_a_x, vector<double> prev_a_y,
 			int target_lane, double target_velocity);

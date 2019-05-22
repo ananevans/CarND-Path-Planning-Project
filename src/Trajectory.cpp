@@ -15,10 +15,10 @@
 #include <iostream>
 #include <vector>
 
-#define DISTANCE_AHEAD 30.0
+#define DISTANCE_AHEAD 45.0
 #define WAYPOINTS_DISTANCE 30.0
 
-#define TIME_HORIZON 1
+#define TIME_HORIZON 2
 
 using namespace std;
 
@@ -98,119 +98,133 @@ vector<double> evaluate(vector<double> coeff, double t) {
  * Previously calculated values for x, y, speed, and acceleration.
  */
 vector<vector<double>> Trajectory::build_trajectory_JMT(
-		vector<double> prev_s, vector<double> prev_d,
-		vector<double> prev_v_s, vector<double> prev_v_d,
-		vector<double> prev_a_s, vector<double> prev_a_d,
+		vector<double> prev_v_x, vector<double> prev_v_y,
+		vector<double> prev_a_x, vector<double> prev_a_y,
 		int target_lane, double target_velocity) {
-	assert(prev_s.size() > 0);
-	assert(prev_s.size() == prev_d.size());
-	assert(prev_s.size() == prev_v_s.size());
-	assert(prev_s.size() == prev_v_d.size());
-	assert(prev_s.size() == prev_a_s.size());
-	assert(prev_s.size() == prev_a_d.size());
 
-//	std::cout << "prev_s: "; debug_print_vector(prev_s); std::cout << "\n";
-//	std::cout << "prev_v_s: "; debug_print_vector(prev_v_s); std::cout << "\n";
-//	std::cout << "prev_a_s: "; debug_print_vector(prev_a_s); std::cout << "\n";
+	vector<double> x_i, x_f, y_i, y_f;
+	double yaw;
 
-	vector<double> s_i, s_f, d_i, d_f;
+	// initial conditions
+	if ( prev_v_x.size() < 2 ) {
+		// position
+		x_i.push_back(car_x);
+		y_i.push_back(car_y);
+		// speed
+		x_i.push_back(0.0);
+		y_i.push_back(0.0);
+		//acceleration
+		x_i.push_back(0.0);
+		y_i.push_back(0.0);
+		yaw = car_yaw;
+	} else {
+		int last_index = prev_x.size() - 1;
+		x_i.push_back(prev_x[last_index]);
+		x_i.push_back(prev_v_x[last_index]);
+		x_i.push_back(prev_a_x[last_index]);
+		y_i.push_back(prev_y[last_index]);
+		y_i.push_back(prev_v_y[last_index]);
+		y_i.push_back(prev_a_y[last_index]);
+		yaw = atan2( y_i[0] - prev_y[last_index-1], x_i[0] - prev_x[last_index-1] );
+	}
 
-	int last_index = prev_s.size() - 1;
-	s_i.push_back(prev_s[last_index]);
-	s_i.push_back(prev_v_s[last_index]);
-	s_i.push_back(prev_a_s[last_index]);
-	s_f.push_back(prev_s[last_index] + DISTANCE_AHEAD);
-	s_f.push_back(target_velocity);
-	s_f.push_back(0.0);
-	d_i.push_back(prev_d[last_index]);
-	d_i.push_back(prev_v_d[last_index]);
-	d_i.push_back(prev_a_d[last_index]);
-	d_f.push_back(get_d(target_lane));
-	d_f.push_back(0.0);
-	d_f.push_back(0.0);
+	//final conditions
+	vector<double> frenet_coord = getFrenet(x_i[0], y_i[0], yaw, map_waypoints_x,
+				map_waypoints_y);
+	double car_s = frenet_coord[0];
+	double car_d = frenet_coord[1];
+	vector<double> wp = getXY(car_s + DISTANCE_AHEAD, get_d(target_lane),
+			map_waypoints_s, map_waypoints_x, map_waypoints_y);
+	vector<double> wp0 = getXY(car_s + DISTANCE_AHEAD - 0.1, get_d(target_lane),
+				map_waypoints_s, map_waypoints_x, map_waypoints_y);
+	// position
+	x_f.push_back(wp[0]);
+	y_f.push_back(wp[1]);
+	// TODO speed
+	double theta = atan2( wp[1] - wp0[1], wp[0] - wp0[0] );
+	x_f.push_back(target_velocity * cos(theta));
+	y_f.push_back(target_velocity * sin(theta));
+	// acceleration
+	x_f.push_back(0.0);
+	y_f.push_back(0.0);
 
 
 
-  	vector<double> new_s, new_v_s, new_a_s, new_d, new_v_d, new_a_d;
+  	vector<double> new_x, new_v_x, new_a_x, new_y, new_v_y, new_a_y;
 	vector<vector<double>> result;
 
 	//copy old data
-	for (int i = 0; i < prev_s.size(); i++) {
-		new_s.push_back( prev_s[i] );
-		new_v_s.push_back( prev_v_s[i] );
-		new_a_s.push_back( prev_a_s[i] );
-		new_d.push_back( prev_d[i] );
-		new_v_d.push_back( prev_v_d[i] );
-		new_a_d.push_back( prev_a_d[i] );
+	for (int i = 0; i < prev_x.size(); i++) {
+		new_x.push_back( prev_x[i] );
+		new_v_x.push_back( prev_v_x[i] );
+		new_a_x.push_back( prev_a_x[i] );
+		new_y.push_back( prev_y[i] );
+		new_v_y.push_back( prev_v_y[i] );
+		new_a_y.push_back( prev_a_y[i] );
 	}
+
+	std::cout << "x_f: "; debug_print_vector(x_f); std::cout << "\n";
+	std::cout << "y_f: "; debug_print_vector(y_f); std::cout << "\n";
 
 	//append new data
 	bool done = false;
-	int factor = 1;
+	double t = DISTANCE_AHEAD / target_velocity;
 	while (!done) {
 
-//		std::cout << "s_i: "; debug_print_vector(s_i); std::cout << "\n";
-//		std::cout << "d_i: "; debug_print_vector(d_i); std::cout << "\n";
-//
-//		std::cout << "s_f: "; debug_print_vector(s_f); std::cout << "\n";
-//		std::cout << "d_f: "; debug_print_vector(d_f); std::cout << "\n";
+		std::cout << "Calculating coeff for time " << t << "\n";
 
-		vector<double> s_coeff = JMT( s_i, s_f, factor*TIME_HORIZON );
-		vector<double> d_coeff = JMT( d_i, d_f, factor*TIME_HORIZON );
+		vector<double> x_coeff = JMT( x_i, x_f, t );
+		vector<double> y_coeff = JMT( y_i, y_f, t );
 
-//		std::cout << "s coeff: "; debug_print_vector(s_coeff); std::cout << "\n";
-//		std::cout << "d coeff: "; debug_print_vector(d_coeff); std::cout << "\n";
+		std::cout << "x_coeff: "; debug_print_vector(x_coeff); std::cout << "\n";
+		std::cout << "y_coeff: "; debug_print_vector(y_coeff); std::cout << "\n";
 
-
-		for ( int i = 0; i < N - prev_s.size(); i++ ) {
-			double s, v_s, a_s, j_s, d, v_d, a_d, j_d;
+		for ( int i = 0; i < N - prev_x.size(); i++ ) {
+			double x, v_x, a_x, j_x, y, v_y, a_y, j_y;
 			double t = (i+1) * DELTA_T;
-			vector<double> s_data = evaluate(s_coeff, (i+1) * DELTA_T);
-			vector<double> d_data = evaluate(d_coeff, (i+1) * DELTA_T);
+			vector<double> x_data = evaluate(x_coeff, (i+1) * DELTA_T);
+			vector<double> y_data = evaluate(y_coeff, (i+1) * DELTA_T);
 			// check for validity
 
-//			std::cout << "s data: "; debug_print_vector(s_data); std::cout << "\n";
-//			std::cout << "d data: "; debug_print_vector(d_data); std::cout << "\n";
-
-			if ( s_data[1] * s_data[1] + d_data[1] + d_data[1] < MAX_VELOCITY_2
-					&& s_data[2] * s_data[2] + d_data[2] + d_data[2] < MAX_ACCELERATION_2
-					&& s_data[3] * s_data[3] + d_data[3] + d_data[3] < MAX_JERK_2
+			if ( x_data[1] * x_data[1] + y_data[1] * y_data[1] < MAX_VELOCITY_2
+					&& x_data[2] * x_data[2] + y_data[2] * y_data[2] < MAX_ACCELERATION_2
+					&& x_data[3] * x_data[3] + y_data[3] * y_data[3] < MAX_JERK_2
 			) {
 				//add to results
-				new_s.push_back(s_data[0]);
-				new_v_s.push_back(s_data[1]);
-				new_a_s.push_back(s_data[2]);
-				new_d.push_back(d_data[0]);
-				new_v_d.push_back(d_data[1]);
-				new_a_d.push_back(d_data[2]);
+				new_x.push_back(x_data[0]);
+				new_v_x.push_back(x_data[1]);
+				new_a_x.push_back(x_data[2]);
+				new_y.push_back(y_data[0]);
+				new_v_y.push_back(y_data[1]);
+				new_a_y.push_back(y_data[2]);
 			} else {
 				break;
 			}
 		}
 
-		if (N == new_s.size()) {
+		if (N == new_x.size()) {
 			done = true;
 		} else {
-			new_s.resize( prev_s.size() );
-			new_v_s.resize( prev_s.size() );
-			new_a_s.resize( prev_s.size() );
+			new_x.resize( prev_x.size() );
+			new_v_x.resize( prev_x.size() );
+			new_a_x.resize( prev_x.size() );
 
-			new_d.resize( prev_s.size() );
-			new_v_d.resize( prev_s.size() );
-			new_a_d.resize( prev_s.size() );
+			new_y.resize( prev_x.size() );
+			new_v_y.resize( prev_x.size() );
+			new_a_y.resize( prev_x.size() );
 		}
 
-		factor += 1;
+		t = t + 0.2;
 	}
 
 	//return result
-	result.push_back( new_s );
-	result.push_back( new_v_s );
-	result.push_back( new_a_s );
+	result.push_back( new_x );
+	result.push_back( new_v_x );
+	result.push_back( new_a_x );
 
-	result.push_back( new_d );
-	result.push_back( new_v_d );
-	result.push_back( new_a_d );
+	result.push_back( new_y );
+	result.push_back( new_v_y );
+	result.push_back( new_a_y );
 	return result;
 }
 

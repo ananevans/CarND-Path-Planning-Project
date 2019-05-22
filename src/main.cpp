@@ -71,12 +71,14 @@ int main() {
 		map_waypoints_dy.push_back(d_y);
 	}
 
-	vector<double> prev_s, prev_v_s, prev_a_s, prev_d, prev_v_d, prev_a_d;
+	vector<double> prev_v_x, prev_a_x, prev_v_y, prev_a_y;
+	double target_velocity = 0.0;
 
 	h.onMessage([&map_waypoints_x,&map_waypoints_y,&map_waypoints_s,
 				 &map_waypoints_dx,&map_waypoints_dy,
-				 &prev_s, &prev_v_s, &prev_a_s,
-				 &prev_d, &prev_v_d, &prev_a_d
+				 &prev_v_x, &prev_a_x,
+				 &prev_v_y, &prev_a_y,
+				 &target_velocity
 				 ]
 				 (uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
 						 uWS::OpCode opCode) {
@@ -126,31 +128,25 @@ int main() {
 					// drop the consumed values
 					int n = previous_path_x.size();
 
-					std::cout << "Previous path size: " << n << "\n";
-
-					int delta = prev_s.size() - n;
-					for (int i = delta; i < prev_s.size(); i++) {
-						prev_s[i-delta] = prev_s[i];
-						prev_v_s[i-delta] = prev_v_s[i];
-						prev_a_s[i-delta] = prev_a_s[i];
-						prev_d[i-delta] = prev_d[i];
-						prev_v_d[i-delta] = prev_v_d[i];
-						prev_a_d[i-delta] = prev_a_d[i];
+					int delta = prev_v_x.size() - n;
+					for (int i = delta; i < prev_v_x.size(); i++) {
+						prev_v_x[i-delta] = prev_v_x[i];
+						prev_a_x[i-delta] = prev_a_x[i];
+						prev_v_y[i-delta] = prev_v_y[i];
+						prev_a_y[i-delta] = prev_a_y[i];
 					}
-					prev_s.resize(n);
-					prev_v_s.resize(n);
-					prev_a_s.resize(n);
-					prev_d.resize(n);
-					prev_v_d.resize(n);
-					prev_a_d.resize(n);
+					prev_v_x.resize(n);
+					prev_a_x.resize(n);
+					prev_v_y.resize(n);
+					prev_a_y.resize(n);
 
 
-					double previous_speed;
-					if ( n > 0) {
-						previous_speed = sqrt( prev_v_s[n-1] * prev_v_s[n-1] + prev_v_d[n-1] * prev_v_d[n-1] );
-					} else {
-						previous_speed = 0.0;
-					}
+//					double previous_speed;
+//					if ( n > 0) {
+//						previous_speed = sqrt( prev_v_x[n-1] * prev_v_x[n-1] + prev_v_y[n-1] * prev_v_y[n-1] );
+//					} else {
+//						previous_speed = 0.0;
+//					}
 
 					int current_lane = get_lane( car_d );
 					Behavior behavior(
@@ -164,7 +160,6 @@ int main() {
 							<< "\n";
 
 					int target_lane = TARGET_LANE;
-					double target_speed = SPEED_LIMIT_MPS;
 
 					switch (next) {
 					case Behavior::CHANGE_LANE_LEFT: {
@@ -180,43 +175,33 @@ int main() {
 						break;
 					}
 					case Behavior::INCREASE_SPEED: {
-						target_speed = min (previous_speed+DELTA_VELOCITY_UP, SPEED_LIMIT_MPS);
+						//target_velocity = min (target_velocity+DELTA_VELOCITY_UP, SPEED_LIMIT_MPS);
+						target_velocity = SPEED_LIMIT_MPS;
 						target_lane = current_lane;
-						previous_speed = target_speed;
-						std::cout << "Increasing speed to " << target_speed << "\n";
+						std::cout << "Increasing speed to " << target_velocity << "\n";
 						break;
 					}
 					case Behavior::DECREASE_SPEED:
-						target_speed = max(previous_speed-DELTA_VELOCITY_DOWN, 0.0);
+						target_velocity = max(target_velocity-DELTA_VELOCITY_DOWN, 0.0);
 						target_lane = current_lane;
-						previous_speed = target_speed;
-						std::cout << "Decreasing speed to " << target_speed << "\n";
+						std::cout << "Decreasing speed to " << target_velocity << "\n";
 						break;
 					default:
-						target_speed = car_speed;
+						target_velocity = car_speed;
 						target_lane = current_lane;
 						break;
 					}
 
 					std::cout << "Calculating trajectory...\n";
 
-					if ( previous_path_x.size() == 0 ) {
-						prev_s.push_back(car_s);
-						prev_v_s.push_back(car_speed);
-						prev_a_s.push_back(0.0);
-						prev_d.push_back(car_d);
-						prev_v_d.push_back(0.0);
-						prev_a_d.push_back(0.0);
-					}
 					Trajectory trajectory(
 							car_x, car_y, deg2rad(car_yaw),
 							previous_path_x, previous_path_y,
 							map_waypoints_x, map_waypoints_y, map_waypoints_s);
 					vector<vector<double>> res = trajectory.build_trajectory_JMT(
-							prev_s, prev_d,
-							prev_v_s, prev_v_d,
-							prev_a_s, prev_a_d,
-							target_lane, target_speed);
+							prev_v_x, prev_v_y,
+							prev_a_x, prev_a_y,
+							target_lane, target_velocity);
 
 					std::cout << "Trajectory calculated...\n";
 
@@ -224,31 +209,19 @@ int main() {
 
 					int start = previous_path_x.size();
 					for ( int i = start; i < N; i++ ) {
-						prev_s.push_back(res[0][i]);
-						prev_v_s.push_back(res[1][i]);
-						prev_a_s.push_back(res[2][i]);
-						prev_d.push_back(res[3][i]);
-						prev_v_d.push_back(res[4][i]);
-						prev_a_d.push_back(res[5][i]);
+						prev_v_x.push_back(res[1][i]);
+						prev_a_x.push_back(res[2][i]);
+						prev_v_y.push_back(res[4][i]);
+						prev_a_y.push_back(res[5][i]);
 					}
 
-					std::cout << "s: "; debug_print_vector(prev_s); std::cout << "\n";
-					std::cout << "d: "; debug_print_vector(prev_d); std::cout << "\n";
+					std::cout << "target speed: " << target_velocity << " last speed: "
+							<< sqrt( prev_v_x[prev_v_x.size()-1] * prev_v_x[prev_v_x.size()-1]
+									+  prev_v_y[prev_v_y.size()-1] * prev_v_y[prev_v_y.size()-1] )
+							<< "\n";
 
-					std::cout << "s speed: "; debug_print_vector(prev_v_s); std::cout << "\n";
-					std::cout << "d speed: "; debug_print_vector(prev_v_d); std::cout << "\n";
-
-
-					//convert to (x,y) coordinates
-					for (int i = 0; i < N; i++) {
-						vector<double> xy = getXY( prev_s[i], prev_d[i],
-								map_waypoints_s, map_waypoints_x, map_waypoints_y );
-						next_x_vals.push_back( xy[0] );
-						next_y_vals.push_back( xy[1] );
-					}
-
-					msgJson["next_x"] = next_x_vals;
-					msgJson["next_y"] = next_y_vals;
+					msgJson["next_x"] = res[0];
+					msgJson["next_y"] = res[3];
 
 					auto msg = "42[\"control\","+ msgJson.dump()+"]";
 
