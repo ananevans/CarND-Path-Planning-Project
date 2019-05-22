@@ -44,6 +44,7 @@ bool Behavior::is_in_same_lane( double d, int lane ) {
 }
 
 
+// returns value in Mph
 double Behavior::get_closest_car_speed() {
 	double target_speed = SPEED_LIMIT;
 	double min_dist = 100000;

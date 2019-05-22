@@ -9,6 +9,8 @@
 using std::string;
 using std::vector;
 
+void debug_print_vector(vector<double> v);
+
 // Checks if the SocketIO event has JSON data.
 // If there is data the JSON object in string format will be returned,
 //   else the empty string "" will be returned.

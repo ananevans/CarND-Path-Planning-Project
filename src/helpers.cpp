@@ -1,10 +1,17 @@
 #include <math.h>
 #include <string>
 #include <vector>
+#include <iostream>
 
 // for convenience
 using std::string;
 using std::vector;
+
+void debug_print_vector(vector<double> v) {
+	for ( int i = 0; i < v.size(); i++ ) {
+		std::cout << v[i] << " ";
+	}
+}
 
 // Checks if the SocketIO event has JSON data.
 // If there is data the JSON object in string format will be returned,

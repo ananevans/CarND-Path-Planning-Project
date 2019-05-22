@@ -12,7 +12,12 @@
 #include <string>
 #include <vector>
 
+#include "Eigen-3.3/Eigen/Dense"
+#include "Eigen-3.3/Eigen/QR"
 #include "spline.h"
+
+using Eigen::MatrixXd;
+using Eigen::VectorXd;
 
 using namespace std;
 
@@ -35,6 +40,12 @@ public:
 			vector <double> prev_x, vector<double> prev_y,
 			int target_lane, double target_velocity);
 
+	vector<vector<double>> build_trajectory_JMT(
+			vector<double> prev_x, vector<double> prev_y,
+			vector<double> prev_v_x, vector<double> prev_v_y,
+			vector<double> prev_a_x, vector<double> prev_a_y,
+			int target_lane, double target_velocity);
+
 private:
 	  vector<double> map_waypoints_x;
 	  vector<double> map_waypoints_y;
@@ -48,6 +59,8 @@ private:
 	  static double get_d(int target_lane);
 
 	  tk::spline get_spline(double x1, double y1, double x2, double y2, double yaw, int target_lane);
+
+	  vector<double> JMT(vector<double> &start, vector<double> &end, double T);
 
 };
 
