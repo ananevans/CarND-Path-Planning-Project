@@ -12,40 +12,34 @@
 
 using namespace std;
 
+enum State {
+	keep_lane, prepare_change_left, prepare_change_right, change_left, change_right
+};
+
 class Behavior {
 
 public:
 	Behavior();
 	virtual ~Behavior();
 	Behavior(
-			double car_s, int current_lane, double ego_speed,
-			vector<vector<double>> sensor_fusion,
 			const vector<double> map_waypoints_x,
 			const vector<double> map_waypoints_y,
 			const vector<double> map_waypoints_s);
 
-	static const int INCREASE_SPEED = 0;
-
-	static const int DECREASE_SPEED = 1;
-
-	static const int CHANGE_LANE_LEFT = 2;
-
-	static const int CHANGE_LANE_RIGHT = 3;
-
 	static const int TARGET_LANE = 1;
 
-	int calculate_behavior();
+	State calculate_behavior(double car_s, int current_lane, double ego_speed, double t,
+			vector<vector<double>> sensor_fusion);
 
-	double get_closest_car_speed();
+	double get_closest_car_speed(double ego_s, int ego_lane, vector<vector<double>> sensor_fusion);
 
 private:
 	  vector<double> map_waypoints_x;
 	  vector<double> map_waypoints_y;
 	  vector<double> map_waypoints_s;
-	  double ego_s;
-	  int ego_lane;
-	  double ego_speed;
-	  vector<vector<double>> sensor_fusion;
+	  State current_state;
+
+	  vector<State> get_next_states();
 
 	  bool is_car_close(int lane, bool check_behind);
 

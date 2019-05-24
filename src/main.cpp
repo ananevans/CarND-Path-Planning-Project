@@ -19,7 +19,6 @@ using nlohmann::json;
 using std::string;
 using std::vector;
 
-
 int get_lane(double car_d) {
 	if (car_d < LANE_WIDTH) {
 		return 0;
@@ -31,8 +30,6 @@ int get_lane(double car_d) {
 		}
 	}
 }
-
-
 
 int main() {
 	uWS::Hub h;
@@ -71,15 +68,10 @@ int main() {
 		map_waypoints_dy.push_back(d_y);
 	}
 
-	vector<double> prev_v_x, prev_a_x, prev_v_y, prev_a_y;
-	double target_velocity = 0.0;
+	double previous_speed = 0.0;
 
 	h.onMessage([&map_waypoints_x,&map_waypoints_y,&map_waypoints_s,
-				 &map_waypoints_dx,&map_waypoints_dy,
-				 &prev_v_x, &prev_a_x,
-				 &prev_v_y, &prev_a_y,
-				 &target_velocity
-				 ]
+				 &map_waypoints_dx,&map_waypoints_dy,&previous_speed]
 				 (uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
 						 uWS::OpCode opCode) {
 		// "42" at the start of the message means there's a websocket message event.
@@ -125,32 +117,36 @@ int main() {
 					 * TODO: define a path made up of (x,y) points that the car will visit
 					 *   sequentially every .02 seconds
 					 */
-					// drop the consumed values
-					int n = previous_path_x.size();
-
-					int delta = prev_v_x.size() - n;
-					for (int i = delta; i < prev_v_x.size(); i++) {
-						prev_v_x[i-delta] = prev_v_x[i];
-						prev_a_x[i-delta] = prev_a_x[i];
-						prev_v_y[i-delta] = prev_v_y[i];
-						prev_a_y[i-delta] = prev_a_y[i];
-					}
-					prev_v_x.resize(n);
-					prev_a_x.resize(n);
-					prev_v_y.resize(n);
-					prev_a_y.resize(n);
-
-
-//					double previous_speed;
-//					if ( n > 0) {
-//						previous_speed = sqrt( prev_v_x[n-1] * prev_v_x[n-1] + prev_v_y[n-1] * prev_v_y[n-1] );
-//					} else {
-//						previous_speed = 0.0;
-//					}
-
 					int current_lane = get_lane( car_d );
+					double future_s, t, future_velocity, future_lane;
+					if (previous_path_x.size() > 1) {
+						// use last generated values
+						double y2 = previous_path_y[previous_path_y.size() - 1] ;
+						double y1 = previous_path_y[previous_path_y.size() - 2];
+						double x2 = previous_path_x[previous_path_x.size() - 1];
+						double x1 = previous_path_x[previous_path_x.size() - 2];
+						double yaw = atan2( y2 - y1, x2 - x1 );
+						vector<double> frenet_coordinates = getFrenet(
+								previous_path_x[previous_path_x.size() - 1],
+								previous_path_y[previous_path_y.size() - 1],
+								yaw,
+								map_waypoints_x, map_waypoints_y
+								);
+						future_s = frenet_coordinates[0];
+						future_lane = get_lane( frenet_coordinates[1] );
+						future_velocity = previous_speed;
+						t = DELTA_T * previous_path_x.size();
+					} else {
+						// use defaults
+						future_s = car_s;
+						future_velocity = car_speed;
+						t = 0.0;
+						future_lane = get_lane(car_d);
+					}
+
 					Behavior behavior(
-							car_s, current_lane, car_speed, sensor_fusion,
+							future_s, future_lane, future_velocity, t,
+							sensor_fusion,
 							map_waypoints_x, map_waypoints_y, map_waypoints_s);
 					int next = behavior.calculate_behavior();
 
@@ -160,6 +156,7 @@ int main() {
 							<< "\n";
 
 					int target_lane = TARGET_LANE;
+					double target_speed = SPEED_LIMIT;
 
 					switch (next) {
 					case Behavior::CHANGE_LANE_LEFT: {
@@ -175,53 +172,80 @@ int main() {
 						break;
 					}
 					case Behavior::INCREASE_SPEED: {
-						//target_velocity = min (target_velocity+DELTA_VELOCITY_UP, SPEED_LIMIT_MPS);
-						target_velocity = SPEED_LIMIT_MPS;
+						target_speed = min (previous_speed+DELTA_VELOCITY_UP, SPEED_LIMIT);
 						target_lane = current_lane;
-						std::cout << "Increasing speed to " << target_velocity << "\n";
+						previous_speed = target_speed;
+						std::cout << "Increasing speed to " << target_speed << "\n";
 						break;
 					}
 					case Behavior::DECREASE_SPEED:
-						target_velocity = max(target_velocity-DELTA_VELOCITY_DOWN, 0.0);
+
+						if ( behavior.get_closest_car_speed() >  previous_speed-DELTA_VELOCITY_DOWN ) {
+							target_speed = behavior.get_closest_car_speed();
+						} else {
+							target_speed = max(previous_speed-DELTA_VELOCITY_DOWN, 0.0);
+						}
 						target_lane = current_lane;
-						std::cout << "Decreasing speed to " << target_velocity << "\n";
+						previous_speed = target_speed;
+						std::cout << "Decreasing speed to " << target_speed << "\n";
 						break;
 					default:
-						target_velocity = car_speed;
+						target_speed = car_speed;
 						target_lane = current_lane;
 						break;
 					}
 
-					std::cout << "Calculating trajectory...\n";
+					// if the target speed is within a small range from the previous one, do not change speed
+					//TODO use the distance information
+					if ( abs(target_speed - previous_speed) < 1 ) {
+						target_speed = previous_speed;
+					}
+
 
 					Trajectory trajectory(
 							car_x, car_y, deg2rad(car_yaw),
 							previous_path_x, previous_path_y,
 							map_waypoints_x, map_waypoints_y, map_waypoints_s);
-					vector<vector<double>> res = trajectory.build_trajectory_JMT(
-							prev_v_x, prev_v_y,
-							prev_a_x, prev_a_y,
-							target_lane, target_velocity);
+					vector<vector<double>> res = trajectory.build_trajectory(car_speed,
+							previous_path_x, previous_path_y,
+							target_lane, target_speed);
+					next_x_vals = res[0];
+					next_y_vals = res[1];
 
-					std::cout << "Trajectory calculated...\n";
+//					vector<double> speeds_x, speeds_y;
+//					for ( int i = 0; i < next_x_vals.size() - 1; i++) {
+//						double vx = (next_x_vals[i+1] - next_x_vals[i])/DELTA_T;
+//						double vy = (next_y_vals[i+1] - next_y_vals[i])/DELTA_T;
+//						speeds_x.push_back(vx);
+//						speeds_y.push_back(vy);
+//						if ( sqrt(vx*vx+vy*vy) >= SPEED_LIMIT_MPS ) {
+//							std::cout << "Speed Violation: " << sqrt(vx*vx+vy*vy)
+//									<< " index "<< i <<"\n";
+//						}
+//					}
+//					vector<double> acceleration_x;
+//					vector<double> acceleration_y;
+//					for ( int i = 0; i < speeds_x.size() - 1; i++ ) {
+//						double ax = (speeds_x[i+1] - speeds_x[i])/DELTA_T;
+//						double ay = (speeds_y[i+1] - speeds_y[i])/DELTA_T;
+//						acceleration_x.push_back( ax );
+//						acceleration_y.push_back( ay );
+//						if ( sqrt(ax*ax+ay*ay) >= MAX_ACCELERATION ) {
+//							std::cout << "Acceleration Violation: " << sqrt(ax*ax+ay*ay)
+//									<< " index "<< i <<"\n";
+//						}
+//					}
+//					for ( int i = 0; i < acceleration_x.size() - 1; i++ ) {
+//						double jx = (acceleration_x[i+1] - acceleration_x[i])/DELTA_T;
+//						double jy = (acceleration_y[i+1] - acceleration_y[i])/DELTA_T;
+//						if ( sqrt(jx*jx+jy*jy) >= MAX_JERK ) {
+//							std::cout << "Jerk Violation: " << sqrt(jx*jx+jy*jy) << " index "<< i <<"\n";
+//						}
+//					}
 
-					//copy the tail from res
 
-					int start = previous_path_x.size();
-					for ( int i = start; i < N; i++ ) {
-						prev_v_x.push_back(res[1][i]);
-						prev_a_x.push_back(res[2][i]);
-						prev_v_y.push_back(res[4][i]);
-						prev_a_y.push_back(res[5][i]);
-					}
-
-					std::cout << "target speed: " << target_velocity << " last speed: "
-							<< sqrt( prev_v_x[prev_v_x.size()-1] * prev_v_x[prev_v_x.size()-1]
-									+  prev_v_y[prev_v_y.size()-1] * prev_v_y[prev_v_y.size()-1] )
-							<< "\n";
-
-					msgJson["next_x"] = res[0];
-					msgJson["next_y"] = res[3];
+					msgJson["next_x"] = next_x_vals;
+					msgJson["next_y"] = next_y_vals;
 
 					auto msg = "42[\"control\","+ msgJson.dump()+"]";
 
@@ -255,6 +279,5 @@ int main() {
 
 	h.run();
 }
-
 
 

@@ -15,7 +15,7 @@
 #include <iostream>
 #include <vector>
 
-#define DISTANCE_AHEAD 45.0
+#define DISTANCE_AHEAD 30.0
 #define WAYPOINTS_DISTANCE 30.0
 
 #define TIME_HORIZON 2
@@ -321,6 +321,16 @@ vector<vector<double>> Trajectory::build_trajectory(double ego_speed,
 	assert(target_velocity > 0);
 
 	int no_intervals = round(target_distance / DELTA_T / target_velocity);
+
+	//check jerk
+	double v_x = target_distance/(no_intervals*DELTA_T);
+	std::vector<std::vector<double>> spline_coeff = s.get_coefficients();
+	vector<double> a = spline_coeff[0];
+
+	std::cout << "jerk: " << 6 * a[1] * v_x * v_x * v_x << "\n";
+	if ( 6 * a[1] * v_x * v_x * v_x > MAX_JERK ) {
+		std::cout << "exceeds max jerk";
+	}
 
 	assert(no_intervals > 0);
 

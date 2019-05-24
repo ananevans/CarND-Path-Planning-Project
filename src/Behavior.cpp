@@ -25,18 +25,52 @@ Behavior::~Behavior() {
 }
 
 
-Behavior::Behavior(	double ego_s, int ego_lane, double ego_speed,
-		vector<vector<double>> sensor_fusion,
+Behavior::Behavior(
 		const vector<double> map_waypoints_x,
 		const vector<double> map_waypoints_y,
 		const vector<double> map_waypoints_s) {
-	this->ego_s = ego_s;
-	this->ego_lane = ego_lane;
-	this->ego_speed = ego_speed;
-	this->sensor_fusion = sensor_fusion;
 	this->map_waypoints_x = map_waypoints_x;
 	this->map_waypoints_y = map_waypoints_y;
 	this->map_waypoints_s = map_waypoints_s;
+	current_state = keep_lane;
+}
+
+vector<State> Behavior::get_next_states() {
+	switch (current_state) {
+	case keep_lane: return {keep_lane, prepare_change_left, prepare_change_right};
+	case prepare_change_left: return {keep_lane, prepare_change_left, change_left};
+	case prepare_change_right: return {keep_lane, prepare_change_right, change_right};
+	case change_left: return {change_left, keep_lane};
+	case change_right: return {change_right, keep_lane};
+	default: return {};
+	}
+}
+
+#define MAX_COST 100
+
+double cost( State next_state, double car_s, int current_lane, double ego_speed, double t,
+		vector<vector<double>> sensor_fusion  ) {
+	switch (next_state) {
+	case keep_lane:
+		return  SPEED_LIMIT_MPS - get_closest_car_speed( car_s, current_lane, sensor_fusion );
+	case prepare_change_left:
+		if ( current_lane == 0 ) {
+			// can't change left
+			return MAX_COST;
+		} else {
+
+		}
+		// left blocked, but there is a gap behind
+	case change_left:
+		// cost 0 if matching speed and gap is next to me
+	}
+}
+
+State Behavior::calculate_behavior(
+		double car_s, int current_lane, double ego_speed, double t,
+		vector<vector<double>> sensor_fusion ) {
+	vector<State> next_states = get_next_states();
+
 }
 
 bool Behavior::is_in_same_lane( double d, int lane ) {
@@ -44,9 +78,9 @@ bool Behavior::is_in_same_lane( double d, int lane ) {
 }
 
 
-// returns value in Mph
-double Behavior::get_closest_car_speed() {
-	double target_speed = SPEED_LIMIT;
+// returns value in mps
+double Behavior::get_closest_car_speed(double ego_s, int ego_lane, vector<vector<double>> sensor_fusion ) {
+	double target_speed = SPEED_LIMIT_MPS;
 	double min_dist = 100000;
 	for (int i=0; i < sensor_fusion.size(); i++ ) {
 		double s = sensor_fusion[i][5];
@@ -102,48 +136,48 @@ bool Behavior::is_car_close(int lane, bool check_behind) {
 	return too_close;
 }
 
-int Behavior::calculate_behavior( ) {
-	if (is_car_close( ego_lane, false )) {
-		// car too close in ego lane
-		std::cout << "Car too close in ego lane\n";
-		if ( ego_lane > 0 && !is_car_close(ego_lane - 1, true) ) {
-			std::cout << "Change lane\n";
-			return CHANGE_LANE_LEFT;
-		} else {
-			std::cout << "Car too close in left lane\n";
-			if (ego_lane < MAX_LANE && !is_car_close(ego_lane+1, true)) {
-				return CHANGE_LANE_RIGHT;
-			} else {
-				return DECREASE_SPEED;
-			}
-		}
-	} else {
-		// free space ahead
-		if ( ego_lane == TARGET_LANE ) {
-			return INCREASE_SPEED;
-		} else {
-			// try to return to middle
-			if (ego_lane < TARGET_LANE) {
-				std::cout << "Would like to change right\n";
-				// want to change lane right
-				if (ego_lane < MAX_LANE && !is_car_close(ego_lane + 1, true)) {
-					std::cout << "Change right\n";
-					return CHANGE_LANE_RIGHT;
-				} else {
-					std::cout << "Can't change right\n";
-					return INCREASE_SPEED;
-				}
-			} else {
-				std::cout << "Would like to change left\n";
-				// want to change lane left
-				if (ego_lane > 0 && !is_car_close(ego_lane - 1, true)) {
-					std::cout << "Change left\n";
-					return CHANGE_LANE_LEFT;
-				} else {
-					std::cout << "Can't change left\n";
-					return INCREASE_SPEED;
-				}
-			}
-		}
-	}
-}
+//int Behavior::calculate_behavior( ) {
+//	if (is_car_close( ego_lane, false )) {
+//		// car too close in ego lane
+//		std::cout << "Car too close in ego lane with speed " << get_closest_car_speed() << "\n";
+//		if ( ego_lane > 0 && !is_car_close(ego_lane - 1, true) ) {
+//			std::cout << "Change lane\n";
+//			return CHANGE_LANE_LEFT;
+//		} else {
+//			std::cout << "Car too close in left lane\n";
+//			if (ego_lane < MAX_LANE && !is_car_close(ego_lane+1, true)) {
+//				return CHANGE_LANE_RIGHT;
+//			} else {
+//				return DECREASE_SPEED;
+//			}
+//		}
+//	} else {
+//		// free space ahead
+//		if ( ego_lane == TARGET_LANE ) {
+//			return INCREASE_SPEED;
+//		} else {
+//			// try to return to middle
+//			if (ego_lane < TARGET_LANE) {
+//				std::cout << "Would like to change right\n";
+//				// want to change lane right
+//				if (ego_lane < MAX_LANE && !is_car_close(ego_lane + 1, true)) {
+//					std::cout << "Change right\n";
+//					return CHANGE_LANE_RIGHT;
+//				} else {
+//					std::cout << "Can't change right\n";
+//					return INCREASE_SPEED;
+//				}
+//			} else {
+//				std::cout << "Would like to change left\n";
+//				// want to change lane left
+//				if (ego_lane > 0 && !is_car_close(ego_lane - 1, true)) {
+//					std::cout << "Change left\n";
+//					return CHANGE_LANE_LEFT;
+//				} else {
+//					std::cout << "Can't change left\n";
+//					return INCREASE_SPEED;
+//				}
+//			}
+//		}
+//	}
+//}

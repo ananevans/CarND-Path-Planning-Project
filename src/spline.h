@@ -111,6 +111,7 @@ public:
     void set_points(const std::vector<double>& x,
                     const std::vector<double>& y, bool cubic_spline=true);
     double operator() (double x) const;
+    std::vector<std::vector<double>> get_coefficients();
 };
 
 
@@ -395,6 +396,9 @@ double spline::operator() (double x) const
     return interpol;
 }
 
+std::vector<std::vector<double>> spline::get_coefficients() {
+	return {m_a,m_b,m_c};
+}
 
 } // namespace tk
 
