@@ -11,6 +11,7 @@
 #include "Trajectory.h"
 #include "Behavior.h"
 #include "Constants.h"
+#include "Prediction.h"
 
 #include <math.h>
 
@@ -117,6 +118,30 @@ int main() {
 					 * TODO: define a path made up of (x,y) points that the car will visit
 					 *   sequentially every .02 seconds
 					 */
+					for ( int i = 0; i < sensor_fusion.size(); i++ ) {
+						int vehicle_id = sensor_fusion[i][0];
+						double x = sensor_fusion[i][1];
+						double y = sensor_fusion[i][2];
+						double vx = sensor_fusion[i][3];
+						double vy = sensor_fusion[i][4];
+						double s = sensor_fusion[i][5];
+						double d = sensor_fusion[i][6];
+						int lane = get_lane(d);
+
+						if ( d >= 0 && abs(car_s - s) < 100 ) {
+							vector<Prediction> predictions =  Prediction::predict(
+									lane, x, y, vx, vy, s, d,
+									map_waypoints_x, map_waypoints_y, map_waypoints_s);
+							for (int p=0; p< predictions.size(); p++) {
+								std::cout << vehicle_id
+										<< ": probability " << predictions[p].get_probability()
+										<< " behavior  " << predictions[p].get_behavior()
+										<< "\n";
+							}
+						}
+					}
+
+
 					int current_lane = get_lane( car_d );
 					double future_s, t, future_velocity, future_lane;
 					if (previous_path_x.size() > 1) {
@@ -144,11 +169,9 @@ int main() {
 						future_lane = get_lane(car_d);
 					}
 
-					Behavior behavior(
-							future_s, future_lane, future_velocity, t,
-							sensor_fusion,
-							map_waypoints_x, map_waypoints_y, map_waypoints_s);
-					int next = behavior.calculate_behavior();
+					Behavior behavior(map_waypoints_x, map_waypoints_y, map_waypoints_s);
+					int next = behavior.calculate_behavior(future_s, future_lane, future_velocity, t,
+							sensor_fusion);
 
 					std::cout << "car: x:" << car_x << " y:" << car_y
 							<< " speed: " << car_speed << " s: " << car_s
@@ -159,36 +182,37 @@ int main() {
 					double target_speed = SPEED_LIMIT;
 
 					switch (next) {
-					case Behavior::CHANGE_LANE_LEFT: {
+					case change_left: {
 						assert(current_lane > 0);
 						target_lane = current_lane - 1;
 						std::cout<<"left\n";
 						break;
 					}
-					case Behavior::CHANGE_LANE_RIGHT: {
+					case change_right: {
 						assert(current_lane<MAX_LANE);
 						target_lane = current_lane + 1;
 						std::cout<<"right\n";
 						break;
 					}
-					case Behavior::INCREASE_SPEED: {
+					case keep_lane: {
 						target_speed = min (previous_speed+DELTA_VELOCITY_UP, SPEED_LIMIT);
 						target_lane = current_lane;
 						previous_speed = target_speed;
 						std::cout << "Increasing speed to " << target_speed << "\n";
 						break;
+						// TODO decide increase speed or slow down
 					}
-					case Behavior::DECREASE_SPEED:
-
-						if ( behavior.get_closest_car_speed() >  previous_speed-DELTA_VELOCITY_DOWN ) {
-							target_speed = behavior.get_closest_car_speed();
-						} else {
-							target_speed = max(previous_speed-DELTA_VELOCITY_DOWN, 0.0);
-						}
-						target_lane = current_lane;
-						previous_speed = target_speed;
-						std::cout << "Decreasing speed to " << target_speed << "\n";
-						break;
+//					case Behavior::DECREASE_SPEED:
+//
+//						if ( behavior.get_closest_car_speed() >  previous_speed-DELTA_VELOCITY_DOWN ) {
+//							target_speed = behavior.get_closest_car_speed();
+//						} else {
+//							target_speed = max(previous_speed-DELTA_VELOCITY_DOWN, 0.0);
+//						}
+//						target_lane = current_lane;
+//						previous_speed = target_speed;
+//						std::cout << "Decreasing speed to " << target_speed << "\n";
+//						break;
 					default:
 						target_speed = car_speed;
 						target_lane = current_lane;
@@ -206,8 +230,7 @@ int main() {
 							car_x, car_y, deg2rad(car_yaw),
 							previous_path_x, previous_path_y,
 							map_waypoints_x, map_waypoints_y, map_waypoints_s);
-					vector<vector<double>> res = trajectory.build_trajectory(car_speed,
-							previous_path_x, previous_path_y,
+					vector<vector<double>> res = trajectory.build_trajectory(
 							target_lane, target_speed);
 					next_x_vals = res[0];
 					next_y_vals = res[1];

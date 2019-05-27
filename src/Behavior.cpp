@@ -48,7 +48,7 @@ vector<State> Behavior::get_next_states() {
 
 #define MAX_COST 100
 
-double cost( State next_state, double car_s, int current_lane, double ego_speed, double t,
+double Behavior::cost( State next_state, double car_s, int current_lane, double ego_speed, double t,
 		vector<vector<double>> sensor_fusion  ) {
 	switch (next_state) {
 	case keep_lane:
@@ -61,16 +61,18 @@ double cost( State next_state, double car_s, int current_lane, double ego_speed,
 
 		}
 		// left blocked, but there is a gap behind
-	case change_left:
+	case change_left: {
 		// cost 0 if matching speed and gap is next to me
 	}
+	}
+	return 0.0; // TODO
 }
 
 State Behavior::calculate_behavior(
 		double car_s, int current_lane, double ego_speed, double t,
 		vector<vector<double>> sensor_fusion ) {
 	vector<State> next_states = get_next_states();
-
+	return keep_lane; // TODO
 }
 
 bool Behavior::is_in_same_lane( double d, int lane ) {
@@ -95,7 +97,8 @@ double Behavior::get_closest_car_speed(double ego_s, int ego_lane, vector<vector
 }
 
 
-bool Behavior::is_car_close(int lane, bool check_behind) {
+bool Behavior::is_car_close(double ego_s, int lane, double ego_speed,
+		bool check_behind, vector<vector<double>> sensor_fusion) {
 
 	bool too_close = false;
 

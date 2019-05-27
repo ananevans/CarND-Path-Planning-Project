@@ -41,10 +41,13 @@ private:
 
 	  vector<State> get_next_states();
 
-	  bool is_car_close(int lane, bool check_behind);
+	  bool is_car_close(double ego_s, int lane, double ego_speed,
+			  bool check_behind, vector<vector<double>> sensor_fusion);
 
 	  static bool is_in_same_lane(double d, int lane);
 
+	  double cost( State next_state, double car_s, int current_lane, double ego_speed, double t,
+	  		vector<vector<double>> sensor_fusion  );
 };
 
 #endif /* BEHAVIOR_H_ */

@@ -5,10 +5,12 @@
  *      Author: nora
  */
 #include <vector>
-#include <random>
 #include <assert.h>
+#include <iostream>
+#include <math.h>
 
 #include "Prediction.h"
+#include "Trajectory.h"
 
 #include "Constants.h"
 
@@ -21,32 +23,93 @@ Prediction::~Prediction() {
 	// TODO Auto-generated destructor stub
 }
 
+PredictedBehavior Prediction::get_behavior() {
+	return behavior;
+}
 
-std::vector<double> Prediction::predict(double d, int lane) {
-	std::vector<double> result(3, 0.0);
+double Prediction::get_probability() {
+	return probability;
+}
+
+std::vector<double> Prediction::get_x() {
+	return x;
+}
+
+std::vector<double> Prediction::get_y() {
+	return y;
+}
+
+double gaussian( double mu, double std_dev, double x ) {
+	return 1/(std_dev * sqrt(2+M_PI)) * exp(-0.5*((x-mu)/std_dev)*((x-mu)/std_dev));
+}
+
+
+std::vector<Prediction> Prediction::predict(int lane,
+		double x, double y, double vx, double vy,
+		double s, double d,
+		std::vector<double> map_waypoints_x,
+		std::vector<double> map_waypoints_y,
+		std::vector<double> map_waypoints_s
+		) {
+	std::vector<Prediction> result;
 	double left = lane * LANE_WIDTH;
 	double right = (lane+1) * LANE_WIDTH;
 	double middle = (lane + 0.5) * LANE_WIDTH;
-
-	double std_dev = LANE_WIDTH / 4;
-
-	std::default_random_engine generator;
-	std::normal_distribution<double> left_distribution(left, std_dev);
-	std::normal_distribution<double> middle_distribution(middle, std_dev);
-	std::normal_distribution<double> right_distribution(right, std_dev);
-
-	if ( lane != 0 ) {
-		result[Prediction::CHANGE_LEFT_INDEX] = left_distribution(generator);
+	double std_dev = 0.75;
+	double pl = gaussian( left, std_dev, d);
+	if ( lane == 0 ) {
+		pl = 0;
 	}
-	result[Prediction::KEEP_LANE_INDEX] = middle_distribution(generator);
-	if ( lane != MAX_LANE ) {
-		result[Prediction::CHANGE_RIGHT_INDEX] = right_distribution(generator);
+	if ( pl < 0.001 ) {
+		pl = 0.0;
 	}
-
-	double sum = result[0] + result[1] + result[2];
-	assert(sum > 0.0);
-	for ( int i=0 ; i < result.size(); i++) {
-		result[i] = result[i]/sum;
+	double pm = gaussian( middle, std_dev, d);
+	if ( pm < 0.001 ) {
+		pm = 0.0;
+	}
+	double pr = gaussian( right, std_dev, d);
+	if ( lane == MAX_LANE ) {
+		pr = 0;
+	}
+	if ( pr < 0.001 ) {
+		pr = 0.0;
+	}
+	double sum = pl + pm + pr;
+	pl /= sum;
+	pm /= sum;
+	pr /= sum;
+	if ( lane != 0 && pl > 0.0) {
+		Prediction prediction;
+		prediction.probability = pl;
+		prediction.behavior = predict_change_left;
+		Trajectory trajectory( x, y, atan2(vy, vx), {}, {},
+				map_waypoints_x, map_waypoints_y, map_waypoints_s);
+		vector<vector<double>> xy = trajectory.build_trajectory(lane-1, sqrt(vx*vx + vy*vy));
+		prediction.x = xy[0];
+		prediction.y = xy[1];
+		result.push_back(prediction);
+	}
+	if ( pm > 0.0 ){
+		Prediction prediction;
+		prediction.probability = pm;
+		prediction.behavior = predict_keep_lane;
+		Trajectory trajectory( x, y, atan2(vy, vx), {}, {},
+				map_waypoints_x, map_waypoints_y, map_waypoints_s);
+		vector<vector<double>> xy = trajectory.build_trajectory(lane, sqrt(vx*vx + vy*vy));
+		prediction.x = xy[0];
+		prediction.y = xy[1];
+		result.push_back(prediction);
+	}
+	if ( lane != MAX_LANE && pr > 0.0 ) {
+		Prediction prediction;
+		prediction.probability = pr;
+		prediction.behavior = predict_change_right;
+		Trajectory trajectory( x, y, atan2(vy, vx), {}, {},
+				map_waypoints_x, map_waypoints_y, map_waypoints_s);
+		vector<vector<double>> xy = trajectory.build_trajectory(lane+1, sqrt(vx*vx + vy*vy));
+		prediction.x = xy[0];
+		prediction.y = xy[1];
+		result.push_back(prediction);
 	}
 	return result;
 }

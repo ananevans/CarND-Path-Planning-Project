@@ -23,7 +23,6 @@ using namespace std;
 
 class Trajectory {
 public:
-	Trajectory();
 
 	Trajectory(
 			double car_x, double car_y, double car_yaw,
@@ -36,8 +35,7 @@ public:
 
 	vector<vector<double>> build_straight_trajectory();
 
-	vector<vector<double>> build_trajectory(double ego_speed,
-			vector <double> prev_x, vector<double> prev_y,
+	vector<vector<double>> build_trajectory(
 			int target_lane, double target_velocity);
 
 	vector<vector<double>> build_trajectory_JMT(
