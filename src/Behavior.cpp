@@ -7,6 +7,8 @@
 
 #include "Behavior.h"
 #include "Constants.h"
+#include "Trajectory.h"
+#include "TrajectoryGenerator.h"
 
 
 #include <vector>
@@ -15,15 +17,9 @@
 
 using namespace std;
 
-Behavior::Behavior() {
-	// TODO Auto-generated constructor stub
-
-}
-
 Behavior::~Behavior() {
 	// TODO Auto-generated destructor stub
 }
-
 
 Behavior::Behavior(
 		const vector<double> map_waypoints_x,
@@ -33,6 +29,7 @@ Behavior::Behavior(
 	this->map_waypoints_y = map_waypoints_y;
 	this->map_waypoints_s = map_waypoints_s;
 	current_state = keep_lane;
+	previous_speed = 0.0;
 }
 
 vector<State> Behavior::get_next_states() {
@@ -46,98 +43,150 @@ vector<State> Behavior::get_next_states() {
 	}
 }
 
-#define MAX_COST 100
-
-double Behavior::cost( State next_state, double car_s, int current_lane, double ego_speed, double t,
-		vector<vector<double>> sensor_fusion  ) {
-	switch (next_state) {
-	case keep_lane:
-		return  SPEED_LIMIT_MPS - get_closest_car_speed( car_s, current_lane, sensor_fusion );
-	case prepare_change_left:
-		if ( current_lane == 0 ) {
-			// can't change left
-			return MAX_COST;
-		} else {
-
-		}
-		// left blocked, but there is a gap behind
-	case change_left: {
-		// cost 0 if matching speed and gap is next to me
+vector<vector<double>> Behavior::calculate_behavior(
+		double car_x, double car_y, double car_s, double car_d,
+		double car_speed, double car_yaw,
+		vector<double> prev_path_x, vector<double> prev_path_y, double prev_end_s, double prev_end_d,
+		vector<vector<Prediction>> predictions) {
+	// update state if needed
+	if ( this->current_state == change_left || this->current_state == change_right) {
+		if (this->previous_lane != Trajectory::get_lane(car_d)) {
+			// lane was changed, update state to KL and lane
+			this->current_state = keep_lane;
+			this->previous_lane = Trajectory::get_lane(car_d);
+		} // else the lane changing did not complete
 	}
-	}
-	return 0.0; // TODO
-}
-
-State Behavior::calculate_behavior(
-		double car_s, int current_lane, double ego_speed, double t,
-		vector<vector<double>> sensor_fusion ) {
 	vector<State> next_states = get_next_states();
-	return keep_lane; // TODO
-}
-
-bool Behavior::is_in_same_lane( double d, int lane ) {
-	return (lane*LANE_WIDTH < d ) && (d<(lane+1)*LANE_WIDTH);
-}
-
-
-// returns value in mps
-double Behavior::get_closest_car_speed(double ego_s, int ego_lane, vector<vector<double>> sensor_fusion ) {
-	double target_speed = SPEED_LIMIT_MPS;
-	double min_dist = 100000;
-	for (int i=0; i < sensor_fusion.size(); i++ ) {
-		double s = sensor_fusion[i][5];
-		if (is_in_same_lane(  sensor_fusion[i][6], ego_lane ) ) {
-			if (ego_s < s && (s-ego_s) < min_dist) {
-				min_dist = s-ego_s;
-				target_speed = sqrt(sensor_fusion[i][3]*sensor_fusion[i][3] + sensor_fusion[i][4]*sensor_fusion[i][4]);
-			}
-		}
+	for (auto s = next_states.begin(); s != next_states.end(); ++s) {
+		vector<Trajectory> trajectories = generate_trajectories(*s, car_x, car_y, car_s, car_d, car_speed, car_yaw,
+				prev_path_x, prev_path_y, prev_end_s, prev_end_d);
 	}
-	return target_speed;
+	// find trajectory of minimum cost
+	return {}; // TODO
 }
 
-
-bool Behavior::is_car_close(double ego_s, int lane, double ego_speed,
-		bool check_behind, vector<vector<double>> sensor_fusion) {
-
-	bool too_close = false;
-
-	for (int i=0; i < sensor_fusion.size(); i++ ) {
-		if (is_in_same_lane(  sensor_fusion[i][6], lane ) ) {
-			double speed = sqrt(sensor_fusion[i][3]*sensor_fusion[i][3] + sensor_fusion[i][4]*sensor_fusion[i][4]);
-			double s = sensor_fusion[i][5];
-			if ( ego_s < s) {
-				// car ahead
-				if ( s - ego_s < GAP ) {
-					// gap too small
-					if ( ego_speed >= speed ) {
-						// ego car is faster than the one ahead
-						too_close = true;
-					}
-				}
-			} else {
-				// car behind
-				if (check_behind) {
-					if ( ego_s - s < GAP  ) {
-						// car behind is within GAP
-						if (ego_s - s < GAP/2) {
-							// car too close
-							too_close = true;
-						} else {
-							if (ego_speed > speed) {
-								// ego car is faster
-							} else {
-								// car in less than half of gap and faster
-								too_close = true;
-							}
-						}
-					}
-				}
-			}
+vector<Trajectory> Behavior::generate_trajectories( State s,
+			  double car_x, double car_y, double car_s, double car_d,
+			  double car_speed, double car_yaw,
+			  vector<double> prev_path_x, vector<double> prev_path_y, double prev_end_s, double prev_end_d) {
+	TrajectoryGenerator gen(car_x, car_y, car_yaw, prev_path_x, prev_path_y,
+			this->map_waypoints_x, this->map_waypoints_y, this->map_waypoints_s);
+	switch (s) {
+	case keep_lane:
+	case prepare_change_left:
+	case prepare_change_right: {
+		vector<Trajectory> result;
+		// three possible trajectories: maintain speed, increase speed, decrease speed
+		vector<double> delta_velocity = { 0.0, DELTA_VELOCITY_UP, DELTA_VELOCITY_DOWN};
+		for (int i=0; i<delta_velocity.size(); i++) {
+			double target_velocity = this->previous_speed + delta_velocity[i];
+			Trajectory trajectory = gen.build_trajectory( this->previous_lane, target_velocity );
+			result.push_back(trajectory);
 		}
+		return result;
 	}
-	return too_close;
+	case change_left: {
+		Trajectory trajectory = gen.build_trajectory( this->previous_lane - 1, this->previous_speed );
+		vector<Trajectory> result;
+		result.push_back(trajectory);
+		return result;
+	}
+	case change_right: {
+		Trajectory trajectory = gen.build_trajectory( this->previous_lane + 1, this->previous_speed );
+		vector<Trajectory> result;
+		result.push_back(trajectory);
+		return result;
+	}
+	default:
+		assert(true);
+		return {};
+	}
 }
+// TODO
+
+//double Behavior::cost( State next_state, double car_s, int current_lane, double ego_speed, double t,
+//		vector<vector<double>> sensor_fusion  ) {
+//	switch (next_state) {
+//	case keep_lane:
+//		return  SPEED_LIMIT_MPS - get_closest_car_speed( car_s, current_lane, sensor_fusion );
+//	case prepare_change_left:
+//		if ( current_lane == 0 ) {
+//			// can't change left
+//			return MAX_COST;
+//		} else {
+//
+//		}
+//		// left blocked, but there is a gap behind
+//	case change_left: {
+//		// cost 0 if matching speed and gap is next to me
+//	}
+//	}
+//	return 0.0; // TODO
+//}
+//
+//bool Behavior::is_in_same_lane( double d, int lane ) {
+//	return (lane*LANE_WIDTH < d ) && (d<(lane+1)*LANE_WIDTH);
+//}
+//
+//
+//// returns value in mps
+//double Behavior::get_closest_car_speed(double ego_s, int ego_lane, vector<vector<double>> sensor_fusion ) {
+//	double target_speed = SPEED_LIMIT_MPS;
+//	double min_dist = 100000;
+//	for (int i=0; i < sensor_fusion.size(); i++ ) {
+//		double s = sensor_fusion[i][5];
+//		if (is_in_same_lane(  sensor_fusion[i][6], ego_lane ) ) {
+//			if (ego_s < s && (s-ego_s) < min_dist) {
+//				min_dist = s-ego_s;
+//				target_speed = sqrt(sensor_fusion[i][3]*sensor_fusion[i][3] + sensor_fusion[i][4]*sensor_fusion[i][4]);
+//			}
+//		}
+//	}
+//	return target_speed;
+//}
+//
+//
+//bool Behavior::is_car_close(double ego_s, int lane, double ego_speed,
+//		bool check_behind, vector<vector<double>> sensor_fusion) {
+//
+//	bool too_close = false;
+//
+//	for (int i=0; i < sensor_fusion.size(); i++ ) {
+//		if (is_in_same_lane(  sensor_fusion[i][6], lane ) ) {
+//			double speed = sqrt(sensor_fusion[i][3]*sensor_fusion[i][3] + sensor_fusion[i][4]*sensor_fusion[i][4]);
+//			double s = sensor_fusion[i][5];
+//			if ( ego_s < s) {
+//				// car ahead
+//				if ( s - ego_s < GAP ) {
+//					// gap too small
+//					if ( ego_speed >= speed ) {
+//						// ego car is faster than the one ahead
+//						too_close = true;
+//					}
+//				}
+//			} else {
+//				// car behind
+//				if (check_behind) {
+//					if ( ego_s - s < GAP  ) {
+//						// car behind is within GAP
+//						if (ego_s - s < GAP/2) {
+//							// car too close
+//							too_close = true;
+//						} else {
+//							if (ego_speed > speed) {
+//								// ego car is faster
+//							} else {
+//								// car in less than half of gap and faster
+//								too_close = true;
+//							}
+//						}
+//					}
+//				}
+//			}
+//		}
+//	}
+//	return too_close;
+//}
 
 //int Behavior::calculate_behavior( ) {
 //	if (is_car_close( ego_lane, false )) {

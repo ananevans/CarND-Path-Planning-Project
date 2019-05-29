@@ -16,16 +16,15 @@
 // middle lane
 #define TARGET_LANE 1
 
-#define N 50
-
-// min gap between cars 2s at 50mph
-#define GAP 45.0
+#define NO_POINTS 50
 
 // time interval between two points
 #define DELTA_T 0.02
 
-#define SPEED_LIMIT 48.0
+#define SPEED_LIMIT 50.0
 #define SPEED_LIMIT_MPS SPEED_LIMIT * 0.44704
+
+#define
 
 #define MAX_ACCELERATION_2 9.5 * 9.5
 

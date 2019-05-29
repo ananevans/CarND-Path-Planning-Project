@@ -8,29 +8,17 @@
 #include "helpers.h"
 #include "json.hpp"
 
-#include "Trajectory.h"
 #include "Behavior.h"
 #include "Constants.h"
 #include "Prediction.h"
 
 #include <math.h>
+#include "TrajectoryGenerator.h"
 
 // for convenience
 using nlohmann::json;
 using std::string;
 using std::vector;
-
-int get_lane(double car_d) {
-	if (car_d < LANE_WIDTH) {
-		return 0;
-	} else {
-		if (car_d < 2*LANE_WIDTH) {
-			return 1;
-		} else {
-			return 2;
-		}
-	}
-}
 
 int main() {
 	uWS::Hub h;
@@ -69,10 +57,10 @@ int main() {
 		map_waypoints_dy.push_back(d_y);
 	}
 
-	double previous_speed = 0.0;
+	Behavior behavior(map_waypoints_x, map_waypoints_y, map_waypoints_s);
 
 	h.onMessage([&map_waypoints_x,&map_waypoints_y,&map_waypoints_s,
-				 &map_waypoints_dx,&map_waypoints_dy,&previous_speed]
+				 &map_waypoints_dx,&map_waypoints_dy,&behavior]
 				 (uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
 						 uWS::OpCode opCode) {
 		// "42" at the start of the message means there's a websocket message event.
@@ -118,6 +106,8 @@ int main() {
 					 * TODO: define a path made up of (x,y) points that the car will visit
 					 *   sequentially every .02 seconds
 					 */
+					// calculate predictions for vehicles within 100m from the ego vehicle
+					vector<vector<Prediction>> all_predictions;
 					for ( int i = 0; i < sensor_fusion.size(); i++ ) {
 						int vehicle_id = sensor_fusion[i][0];
 						double x = sensor_fusion[i][1];
@@ -126,11 +116,10 @@ int main() {
 						double vy = sensor_fusion[i][4];
 						double s = sensor_fusion[i][5];
 						double d = sensor_fusion[i][6];
-						int lane = get_lane(d);
 
 						if ( d >= 0 && abs(car_s - s) < 100 ) {
 							vector<Prediction> predictions =  Prediction::predict(
-									lane, x, y, vx, vy, s, d,
+									x, y, vx, vy, s, d,
 									map_waypoints_x, map_waypoints_y, map_waypoints_s);
 							for (int p=0; p< predictions.size(); p++) {
 								std::cout << vehicle_id
@@ -138,40 +127,19 @@ int main() {
 										<< " behavior  " << predictions[p].get_behavior()
 										<< "\n";
 							}
+							if (predictions.size() > 0) {
+								all_predictions.push_back(predictions);
+							}
 						}
 					}
-
-
-					int current_lane = get_lane( car_d );
-					double future_s, t, future_velocity, future_lane;
-					if (previous_path_x.size() > 1) {
-						// use last generated values
-						double y2 = previous_path_y[previous_path_y.size() - 1] ;
-						double y1 = previous_path_y[previous_path_y.size() - 2];
-						double x2 = previous_path_x[previous_path_x.size() - 1];
-						double x1 = previous_path_x[previous_path_x.size() - 2];
-						double yaw = atan2( y2 - y1, x2 - x1 );
-						vector<double> frenet_coordinates = getFrenet(
-								previous_path_x[previous_path_x.size() - 1],
-								previous_path_y[previous_path_y.size() - 1],
-								yaw,
-								map_waypoints_x, map_waypoints_y
-								);
-						future_s = frenet_coordinates[0];
-						future_lane = get_lane( frenet_coordinates[1] );
-						future_velocity = previous_speed;
-						t = DELTA_T * previous_path_x.size();
-					} else {
-						// use defaults
-						future_s = car_s;
-						future_velocity = car_speed;
-						t = 0.0;
-						future_lane = get_lane(car_d);
-					}
-
-					Behavior behavior(map_waypoints_x, map_waypoints_y, map_waypoints_s);
-					int next = behavior.calculate_behavior(future_s, future_lane, future_velocity, t,
-							sensor_fusion);
+					// calculate behavior
+					vector<double> prev_x = previous_path_x;
+					vector<double> prev_y = previous_path_y;
+					vector<vector<double>> xy = behavior.calculate_behavior(
+							car_x, car_y, car_s, car_d,
+							car_speed, car_yaw,
+							prev_x, prev_y, end_path_s, end_path_d, all_predictions
+							);
 
 					std::cout << "car: x:" << car_x << " y:" << car_y
 							<< " speed: " << car_speed << " s: " << car_s
@@ -180,91 +148,6 @@ int main() {
 
 					int target_lane = TARGET_LANE;
 					double target_speed = SPEED_LIMIT;
-
-					switch (next) {
-					case change_left: {
-						assert(current_lane > 0);
-						target_lane = current_lane - 1;
-						std::cout<<"left\n";
-						break;
-					}
-					case change_right: {
-						assert(current_lane<MAX_LANE);
-						target_lane = current_lane + 1;
-						std::cout<<"right\n";
-						break;
-					}
-					case keep_lane: {
-						target_speed = min (previous_speed+DELTA_VELOCITY_UP, SPEED_LIMIT);
-						target_lane = current_lane;
-						previous_speed = target_speed;
-						std::cout << "Increasing speed to " << target_speed << "\n";
-						break;
-						// TODO decide increase speed or slow down
-					}
-//					case Behavior::DECREASE_SPEED:
-//
-//						if ( behavior.get_closest_car_speed() >  previous_speed-DELTA_VELOCITY_DOWN ) {
-//							target_speed = behavior.get_closest_car_speed();
-//						} else {
-//							target_speed = max(previous_speed-DELTA_VELOCITY_DOWN, 0.0);
-//						}
-//						target_lane = current_lane;
-//						previous_speed = target_speed;
-//						std::cout << "Decreasing speed to " << target_speed << "\n";
-//						break;
-					default:
-						target_speed = car_speed;
-						target_lane = current_lane;
-						break;
-					}
-
-					// if the target speed is within a small range from the previous one, do not change speed
-					//TODO use the distance information
-					if ( abs(target_speed - previous_speed) < 1 ) {
-						target_speed = previous_speed;
-					}
-
-
-					Trajectory trajectory(
-							car_x, car_y, deg2rad(car_yaw),
-							previous_path_x, previous_path_y,
-							map_waypoints_x, map_waypoints_y, map_waypoints_s);
-					vector<vector<double>> res = trajectory.build_trajectory(
-							target_lane, target_speed);
-					next_x_vals = res[0];
-					next_y_vals = res[1];
-
-//					vector<double> speeds_x, speeds_y;
-//					for ( int i = 0; i < next_x_vals.size() - 1; i++) {
-//						double vx = (next_x_vals[i+1] - next_x_vals[i])/DELTA_T;
-//						double vy = (next_y_vals[i+1] - next_y_vals[i])/DELTA_T;
-//						speeds_x.push_back(vx);
-//						speeds_y.push_back(vy);
-//						if ( sqrt(vx*vx+vy*vy) >= SPEED_LIMIT_MPS ) {
-//							std::cout << "Speed Violation: " << sqrt(vx*vx+vy*vy)
-//									<< " index "<< i <<"\n";
-//						}
-//					}
-//					vector<double> acceleration_x;
-//					vector<double> acceleration_y;
-//					for ( int i = 0; i < speeds_x.size() - 1; i++ ) {
-//						double ax = (speeds_x[i+1] - speeds_x[i])/DELTA_T;
-//						double ay = (speeds_y[i+1] - speeds_y[i])/DELTA_T;
-//						acceleration_x.push_back( ax );
-//						acceleration_y.push_back( ay );
-//						if ( sqrt(ax*ax+ay*ay) >= MAX_ACCELERATION ) {
-//							std::cout << "Acceleration Violation: " << sqrt(ax*ax+ay*ay)
-//									<< " index "<< i <<"\n";
-//						}
-//					}
-//					for ( int i = 0; i < acceleration_x.size() - 1; i++ ) {
-//						double jx = (acceleration_x[i+1] - acceleration_x[i])/DELTA_T;
-//						double jy = (acceleration_y[i+1] - acceleration_y[i])/DELTA_T;
-//						if ( sqrt(jx*jx+jy*jy) >= MAX_JERK ) {
-//							std::cout << "Jerk Violation: " << sqrt(jx*jx+jy*jy) << " index "<< i <<"\n";
-//						}
-//					}
 
 
 					msgJson["next_x"] = next_x_vals;
