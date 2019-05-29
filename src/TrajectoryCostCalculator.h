@@ -15,7 +15,7 @@
 
 using namespace std;
 
-typedef double (*CostFunctionPtr)(Trajectory ego_trajectory, vector<Prediction> predictions);
+typedef double (*CostFunctionPtr)(Trajectory ego_trajectory, vector<vector<Prediction>> predictions);
 
 #define NO_COST_FN 1
 
@@ -23,7 +23,7 @@ typedef double (*CostFunctionPtr)(Trajectory ego_trajectory, vector<Prediction> 
 class TrajectoryCostCalculator {
 public:
 
-	static double get_cost( Trajectory ego_trajectory, vector<Prediction> predictions );
+	static double get_cost( Trajectory ego_trajectory, vector<vector<Prediction>> predictions );
 
 private:
 	static double WEIGHTS[NO_COST_FN];

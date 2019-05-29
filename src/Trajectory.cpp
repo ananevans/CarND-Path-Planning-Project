@@ -17,9 +17,11 @@ Trajectory::Trajectory(vector<double> x,
 		vector <double> s,
 		vector <double> d,
 		double target_speed,
-		double target_lane) {
+		int target_lane) {
 	this->x = x;
 	this->y = y;
+	this->s = s;
+	this->d = d;
 	this->target_speed = target_speed;
 	this->target_lane = target_lane;
 }
@@ -40,7 +42,7 @@ int Trajectory::get_lane(double car_d) {
 	}
 }
 
-double Trajectory::getTargetLane() const {
+int Trajectory::getTargetLane() const {
 	return target_lane;
 }
 

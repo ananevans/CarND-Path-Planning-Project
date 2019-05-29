@@ -20,11 +20,11 @@ public:
 			vector <double> s,
 			vector <double> d,
 			double target_speed,
-			double target_lane);
+			int target_lane);
 	virtual ~Trajectory();
 
 	static int get_lane(double car_d);
-	double getTargetLane() const;
+	int getTargetLane() const;
 	double getTargetSpeed() const;
 	const vector<double>& getX() const;
 	const vector<double>& getY() const;

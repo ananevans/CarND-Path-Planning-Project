@@ -99,8 +99,10 @@ int main() {
 
 					json msgJson;
 
-					vector<double> next_x_vals;
-					vector<double> next_y_vals;
+//					vector<double> next_x_vals;
+//					vector<double> next_y_vals;
+
+					cout << "Previous iteration used " << NO_POINTS - previous_path_x.size() << "\n";
 
 					/**
 					 * TODO: define a path made up of (x,y) points that the car will visit
@@ -108,6 +110,7 @@ int main() {
 					 */
 					// calculate predictions for vehicles within 100m from the ego vehicle
 					vector<vector<Prediction>> all_predictions;
+					cout << "Calculating predictions ... \n";
 					for ( int i = 0; i < sensor_fusion.size(); i++ ) {
 						int vehicle_id = sensor_fusion[i][0];
 						double x = sensor_fusion[i][1];
@@ -132,6 +135,7 @@ int main() {
 							}
 						}
 					}
+					cout << "Calculating predictions ... DONE for " << all_predictions.size() << " vehicles\n" ;
 					// calculate behavior
 					vector<double> prev_x = previous_path_x;
 					vector<double> prev_y = previous_path_y;
@@ -150,8 +154,8 @@ int main() {
 					double target_speed = SPEED_LIMIT;
 
 
-					msgJson["next_x"] = next_x_vals;
-					msgJson["next_y"] = next_y_vals;
+					msgJson["next_x"] = xy[0];
+					msgJson["next_y"] = xy[1];
 
 					auto msg = "42[\"control\","+ msgJson.dump()+"]";
 

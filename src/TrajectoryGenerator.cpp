@@ -17,7 +17,7 @@
 #include <vector>
 
 #define DISTANCE_AHEAD 30.0
-#define WAYPOINTS_DISTANCE 30.0
+#define WAYPOINTS_DISTANCE 20.0
 
 #define TIME_HORIZON 2
 
@@ -67,6 +67,7 @@ tk::spline TrajectoryGenerator::get_spline(double x1, double y1, double x2, doub
 	double car_s = frenet_coord[0];
 	double d = get_d(lane);
 
+	assert(ct.to_x(x1, y1) < ct.to_x(x2, y2));
 	x.push_back(ct.to_x(x1, y1));
 	x.push_back(ct.to_x(x2, y2));
 
@@ -79,6 +80,10 @@ tk::spline TrajectoryGenerator::get_spline(double x1, double y1, double x2, doub
 			map_waypoints_s, map_waypoints_x, map_waypoints_y);
 	vector<double> wp3 = getXY(car_s + 3 * WAYPOINTS_DISTANCE, d,
 			map_waypoints_s, map_waypoints_x, map_waypoints_y);
+
+	assert(ct.to_x(x2, y2) < ct.to_x(wp1[0], wp1[1]));
+	assert(ct.to_x(wp1[0], wp1[1]) < ct.to_x(wp2[0], wp2[1]));
+	assert(ct.to_x(wp2[0], wp2[1]) < ct.to_x(wp3[0], wp3[1]));
 
 	x.push_back(ct.to_x(wp1[0], wp1[1]));
 	x.push_back(ct.to_x(wp2[0], wp2[1]));
@@ -126,6 +131,8 @@ Trajectory TrajectoryGenerator::build_trajectory(
 		}
 	}
 
+	assert( x1 < x2 );
+
 	tk::spline s = get_spline(x1, y1, x2, y2, yaw, target_lane);
 
 	CoordinateTransformation ct(x2, y2, yaw);
@@ -145,9 +152,8 @@ Trajectory TrajectoryGenerator::build_trajectory(
 	std::vector<std::vector<double>> spline_coeff = s.get_coefficients();
 	vector<double> a = spline_coeff[0];
 
-	std::cout << "jerk: " << 6 * a[1] * v_x * v_x * v_x << "\n";
 	if ( 6 * a[1] * v_x * v_x * v_x > MAX_JERK ) {
-		std::cout << "exceeds max jerk";
+		std::cout << "exceeds max jerk " << 6 * a[1] * v_x * v_x * v_x << "\n";
 	}
 
 	assert(no_intervals > 0);
