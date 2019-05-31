@@ -40,7 +40,7 @@ sudo chmod u+x {simulator_file_name}
 
 ### Implementation
 
-The goal of this project is to generate trajectories that obey the speed limit, are comfortable (acceleration less than 10/ms^2 and jerk smaller than 10m/s^3), change lanes when stuck behind a slow car, with speed as close as possible to the speed limit.
+The goal of this project is to generate trajectories that obey the speed limit, are comfortable (acceleration less than 10m/s^2 and jerk smaller than 10m/s^3), change lanes when stuck behind a slow car, with speed as close as possible to the speed limit.
 
 The sensor fusion data and the car's position and speed are provided by the simulator. The trajectory is a set of 50 points, visited each 20ms by the car. 
 
@@ -70,7 +70,7 @@ I implemented the following cost functions:
 4. Pass the vectors of x and y coordinates to the simulator.
 
 Below is a screenshot of one run that satifies the conditions of the project:
-[Run](https://github.com/ananevans/CarND-Path-Planning-Project/blob/master/images/run.png)
+![Run](https://github.com/ananevans/CarND-Path-Planning-Project/blob/master/images/run.png)
 
 ### Known Issues
 
