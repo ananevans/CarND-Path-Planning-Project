@@ -56,22 +56,19 @@ std::vector<Prediction> Prediction::predict(
 	double left = lane * LANE_WIDTH;
 	double right = (lane+1) * LANE_WIDTH;
 	double middle = (lane + 0.5) * LANE_WIDTH;
-	double pl = gaussian( left, 0.75, d);
+	double pl = gaussian( left, 0.5, d);
 	if ( lane == 0 ) {
 		pl = 0;
 	}
-	if ( pl < 0.1 ) {
+	if ( pl < 0.001 ) {
 		pl = 0.0;
 	}
-	double pm = gaussian( middle, 1, d);
-	if ( pm < 0.1 ) {
-		pm = 0.0;
-	}
-	double pr = gaussian( right, 0.75, d);
+	double pm = gaussian( middle, 0.6, d);
+	double pr = gaussian( right, 0.5, d);
 	if ( lane == MAX_LANE ) {
 		pr = 0;
 	}
-	if ( pr < 0.1 ) {
+	if ( pr < 0.001 ) {
 		pr = 0.0;
 	}
 	double sum = pl + pm + pr;

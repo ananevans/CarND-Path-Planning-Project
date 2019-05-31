@@ -92,7 +92,7 @@ vector<Trajectory> Behavior::generate_trajectories( State s,
 	int current_lane = Trajectory::get_lane(car_d);
 	vector<Trajectory> result;
 	// three possible trajectories: maintain speed, increase speed, decrease speed
-	vector<double> delta_velocity = { 0.0, DELTA_VELOCITY_UP, DELTA_VELOCITY_DOWN};
+	vector<double> delta_velocity = { 0.0, DELTA_VELOCITY_UP, DELTA_VELOCITY_DOWN, 2*DELTA_VELOCITY_DOWN, 3*DELTA_VELOCITY_DOWN};
 	switch (s) {
 	case keep_lane:
 		for (int i=0; i<delta_velocity.size(); i++) {
