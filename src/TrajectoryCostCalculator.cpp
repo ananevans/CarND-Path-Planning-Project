@@ -153,6 +153,23 @@ double gap_cost(Trajectory ego_trajectory, vector<vector<Prediction>> prediction
 	return 0.0;
 }
 
+
+double lane_crossing_cost(Trajectory ego_trajectory, vector<vector<Prediction>> predictions) {
+	int lane0 = 0;
+	int lane1 = 0;
+	vector<double> d = ego_trajectory.getD();
+	for (int i = 0; i < d.size(); i++) {
+		if ( abs( d[i] - LANE_WIDTH ) < 0.5 ) {
+			lane0 += 1;
+		} else {
+			if ( abs( d[i] - 2 * LANE_WIDTH ) < 0.5 ) {
+				lane1 += 1;
+			}
+		}
+	}
+	return 1 - exp( -max(lane0,lane1) );
+}
+
 ///////////////////
 // Comfort
 ///////////////////
@@ -202,7 +219,7 @@ double TrajectoryCostCalculator::WEIGHTS[NO_COST_FN] = {
 		, 100
 		, 100
 		, 1000
-		, 0
+		, 80
 		, 0
 };
 CostFunctionPtr TrajectoryCostCalculator::COST_FUNCTIONS[NO_COST_FN] = {
@@ -214,7 +231,7 @@ CostFunctionPtr TrajectoryCostCalculator::COST_FUNCTIONS[NO_COST_FN] = {
 		, buffer_cost
 		, lane_speed_match
 		, gap_cost
-		, zero_cost
+		, lane_crossing_cost
 		, zero_cost
 };
 
@@ -227,7 +244,7 @@ string names[NO_COST_FN] = {
 		, "buffer_cost"
 		, "lane_speed_match"
 		, "gap_cost"
-		, "zero_cost"
+		, "lane_crossing_cost"
 		, "zero_cost"
 };
 
