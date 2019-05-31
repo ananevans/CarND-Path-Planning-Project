@@ -60,18 +60,18 @@ std::vector<Prediction> Prediction::predict(
 	if ( lane == 0 ) {
 		pl = 0;
 	}
-	if ( pl < 0.001 ) {
+	if ( pl < 0.1 ) {
 		pl = 0.0;
 	}
 	double pm = gaussian( middle, 1, d);
-	if ( pm < 0.001 ) {
+	if ( pm < 0.1 ) {
 		pm = 0.0;
 	}
 	double pr = gaussian( right, 0.75, d);
 	if ( lane == MAX_LANE ) {
 		pr = 0;
 	}
-	if ( pr < 0.001 ) {
+	if ( pr < 0.1 ) {
 		pr = 0.0;
 	}
 	double sum = pl + pm + pr;
@@ -84,7 +84,7 @@ std::vector<Prediction> Prediction::predict(
 		prediction.behavior = predict_change_left;
 		TrajectoryGenerator gen( x, y, atan2(vy, vx), {}, {},
 				map_waypoints_x, map_waypoints_y, map_waypoints_s);
-		prediction.trajectory = gen.build_trajectory(lane-1, sqrt(vx*vx + vy*vy));
+		prediction.trajectory = gen.build_trajectory(lane-1, lane-1, sqrt(vx*vx + vy*vy));
 		result.push_back(prediction);
 	}
 	if ( pm > 0.0 ){
@@ -93,7 +93,7 @@ std::vector<Prediction> Prediction::predict(
 		prediction.behavior = predict_keep_lane;
 		TrajectoryGenerator gen( x, y, atan2(vy, vx), {}, {},
 				map_waypoints_x, map_waypoints_y, map_waypoints_s);
-		prediction.trajectory = gen.build_trajectory(lane, sqrt(vx*vx + vy*vy));
+		prediction.trajectory = gen.build_trajectory(lane, lane, sqrt(vx*vx + vy*vy));
 		result.push_back(prediction);
 	}
 	if ( lane != MAX_LANE && pr > 0.0 ) {
@@ -102,7 +102,7 @@ std::vector<Prediction> Prediction::predict(
 		prediction.behavior = predict_change_right;
 		TrajectoryGenerator gen( x, y, atan2(vy, vx), {}, {},
 				map_waypoints_x, map_waypoints_y, map_waypoints_s);
-		prediction.trajectory =  gen.build_trajectory(lane+1, sqrt(vx*vx + vy*vy));
+		prediction.trajectory =  gen.build_trajectory(lane+1, lane+1, sqrt(vx*vx + vy*vy));
 		result.push_back(prediction);
 	}
 	return result;

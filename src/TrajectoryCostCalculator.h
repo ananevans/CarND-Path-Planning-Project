@@ -17,7 +17,7 @@ using namespace std;
 
 typedef double (*CostFunctionPtr)(Trajectory ego_trajectory, vector<vector<Prediction>> predictions);
 
-#define NO_COST_FN 1
+#define NO_COST_FN 10
 
 
 class TrajectoryCostCalculator {

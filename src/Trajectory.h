@@ -20,22 +20,21 @@ public:
 			vector <double> s,
 			vector <double> d,
 			double target_speed,
-			int target_lane);
+			int target_lane,
+			int final_lane);
 	virtual ~Trajectory();
 
 	static int get_lane(double car_d);
+
 	int getTargetLane() const;
 	double getTargetSpeed() const;
 	const vector<double>& getX() const;
 	const vector<double>& getY() const;
+	const vector<double>& getD() const;
+	const vector<double>& getS() const;
 
-	const vector<double>& getD() const {
-		return d;
-	}
-
-	const vector<double>& getS() const {
-		return s;
-	}
+	void debug_info();
+	int getFinalLane() const;
 
 private:
 	vector<double> x;
@@ -43,7 +42,8 @@ private:
 	vector<double> s;
 	vector <double> d;
 	double target_speed;
-	double target_lane;
+	int target_lane;
+	int final_lane;
 };
 
 #endif /* SRC_TRAJECTORY_H_ */

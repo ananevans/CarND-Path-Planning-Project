@@ -42,7 +42,7 @@ private:
 	  vector<double> map_waypoints_s;
 	  State current_state;
 	  double previous_speed;
-	  int previous_lane;
+	  //int previous_lane;
 
 	  vector<State> get_next_states();
 

@@ -26,11 +26,9 @@
 
 #define TARGET_SPEED 48.0 * 0.44704
 
-#define DELTA_VELOCITY_UP 1
+#define DELTA_VELOCITY_UP 0.1
 
-#define DELTA_VELOCITY_DOWN 0.3
-
-#define MAX_JERK 9.5
+#define DELTA_VELOCITY_DOWN -0.1
 
 
 #endif /* SRC_CONSTANTS_H_ */

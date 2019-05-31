@@ -128,6 +128,8 @@ int main() {
 								std::cout << vehicle_id
 										<< ": probability " << predictions[p].get_probability()
 										<< " behavior  " << predictions[p].get_behavior()
+										<< " speed " << predictions[p].getTrajectory().getTargetSpeed()
+										<< " lane " << predictions[p].getTrajectory().getTargetLane()
 										<< "\n";
 							}
 							if (predictions.size() > 0) {
@@ -147,6 +149,7 @@ int main() {
 
 					std::cout << "car: x:" << car_x << " y:" << car_y
 							<< " speed: " << car_speed << " s: " << car_s
+							<< " d: " << car_d
 							<< " prev size: " << previous_path_x.size()
 							<< "\n";
 

@@ -32,7 +32,7 @@ Behavior::Behavior(
 
 	current_state = keep_lane;
 	previous_speed = 0.0;
-	previous_lane = TARGET_LANE;
+	//previous_lane = TARGET_LANE;
 }
 
 vector<State> Behavior::get_next_states() {
@@ -54,18 +54,28 @@ vector<vector<double>> Behavior::calculate_behavior(
 	vector<State> next_states = get_next_states();
 	double min_cost = 2.0;
 	Trajectory min_trajectory;
+	double new_speed;
+	State new_state;
 	for (auto s = next_states.begin(); s != next_states.end(); ++s) {
 		vector<Trajectory> trajectories = generate_trajectories(*s, car_x, car_y, car_s, car_d, car_speed, car_yaw,
 				prev_path_x, prev_path_y, prev_end_s, prev_end_d);
 		for ( auto ego_traj = trajectories.begin(); ego_traj < trajectories.end(); ++ego_traj) {
 			double crt_cost =  TrajectoryCostCalculator::get_cost( *ego_traj, predictions );
 			if ( crt_cost <= min_cost  ) {
-				//cout << "current state " << *s << " target velocity " << ego_traj->getTargetSpeed() << "\n";
 				min_cost = crt_cost;
 				min_trajectory = *ego_traj;
+				new_speed = ego_traj->getTargetSpeed();
+				new_state = *s;
 			}
+			cout << "New min cost " << min_cost
+					<< " Trajectory cost = " << crt_cost << " "; ego_traj->debug_info();
 		}
 	}
+	previous_speed = new_speed;
+	this->current_state = new_state;
+	cout << "New speed " << previous_speed
+			<< " new state " << current_state
+			<< "\n";
 	assert ( min_cost <= 1.0 );
 	vector<vector<double>> xy(2);
 	xy[0] = min_trajectory.getX();
@@ -79,32 +89,63 @@ vector<Trajectory> Behavior::generate_trajectories( State s,
 			  vector<double> prev_path_x, vector<double> prev_path_y, double prev_end_s, double prev_end_d) {
 	TrajectoryGenerator gen(car_x, car_y, car_yaw, prev_path_x, prev_path_y,
 			this->map_waypoints_x, this->map_waypoints_y, this->map_waypoints_s);
+	int current_lane = Trajectory::get_lane(car_d);
+	vector<Trajectory> result;
+	// three possible trajectories: maintain speed, increase speed, decrease speed
+	vector<double> delta_velocity = { 0.0, DELTA_VELOCITY_UP, DELTA_VELOCITY_DOWN};
 	switch (s) {
 	case keep_lane:
-	case prepare_change_left:
-	case prepare_change_right: {
-		vector<Trajectory> result;
-		// three possible trajectories: maintain speed, increase speed, decrease speed
-		vector<double> delta_velocity = { 0.0, DELTA_VELOCITY_UP, DELTA_VELOCITY_DOWN};
 		for (int i=0; i<delta_velocity.size(); i++) {
 			double target_velocity = this->previous_speed + delta_velocity[i];
 			if (target_velocity > 0.0 ) {
-				Trajectory trajectory = gen.build_trajectory( this->previous_lane, target_velocity );
+				Trajectory trajectory = gen.build_trajectory( current_lane,
+						current_lane,
+						target_velocity );
 				result.push_back(trajectory);
+			}
+		}
+		return result;
+	case prepare_change_left:
+		if (current_lane > 0 ) {
+			for (int i=0; i<delta_velocity.size(); i++) {
+				double target_velocity = this->previous_speed + delta_velocity[i];
+				if (target_velocity > 0.0 ) {
+					Trajectory trajectory = gen.build_trajectory( current_lane,
+							current_lane - 1,
+							target_velocity );
+					result.push_back(trajectory);
+				}
+			}
+		}
+		return result;
+	case prepare_change_right: {
+		if (current_lane < MAX_LANE) {
+			for (int i=0; i<delta_velocity.size(); i++) {
+				double target_velocity = this->previous_speed + delta_velocity[i];
+				if (target_velocity > 0.0 ) {
+					Trajectory trajectory = gen.build_trajectory( current_lane,
+							current_lane+1,
+							target_velocity );
+					result.push_back(trajectory);
+				}
 			}
 		}
 		return result;
 	}
 	case change_left: {
-		Trajectory trajectory = gen.build_trajectory( this->previous_lane - 1, this->previous_speed );
-		vector<Trajectory> result;
-		result.push_back(trajectory);
+		if (current_lane > 0) {
+			Trajectory trajectory = gen.build_trajectory( current_lane - 1, current_lane - 1,
+					this->previous_speed );
+			result.push_back(trajectory);
+		}
 		return result;
 	}
 	case change_right: {
-		Trajectory trajectory = gen.build_trajectory( this->previous_lane + 1, this->previous_speed );
-		vector<Trajectory> result;
-		result.push_back(trajectory);
+		if (current_lane < MAX_LANE) {
+			Trajectory trajectory = gen.build_trajectory( current_lane + 1, current_lane + 1,
+					this->previous_speed );
+			result.push_back(trajectory);
+		}
 		return result;
 	}
 	default:

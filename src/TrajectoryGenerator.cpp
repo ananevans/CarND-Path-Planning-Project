@@ -17,7 +17,7 @@
 #include <vector>
 
 #define DISTANCE_AHEAD 30.0
-#define WAYPOINTS_DISTANCE 20.0
+#define WAYPOINTS_DISTANCE 30.0
 
 #define TIME_HORIZON 2
 
@@ -68,6 +68,7 @@ tk::spline TrajectoryGenerator::get_spline(double x1, double y1, double x2, doub
 	double d = get_d(lane);
 
 	assert(ct.to_x(x1, y1) < ct.to_x(x2, y2));
+
 	x.push_back(ct.to_x(x1, y1));
 	x.push_back(ct.to_x(x2, y2));
 
@@ -105,6 +106,7 @@ tk::spline TrajectoryGenerator::get_spline(double x1, double y1, double x2, doub
  */
 Trajectory TrajectoryGenerator::build_trajectory(
 		int target_lane,
+		int final_lane,
 		double target_velocity) {
 
 	vector<double> next_x_vals;
@@ -131,30 +133,18 @@ Trajectory TrajectoryGenerator::build_trajectory(
 		}
 	}
 
-	assert( x1 < x2 );
-
 	tk::spline s = get_spline(x1, y1, x2, y2, yaw, target_lane);
 
-	CoordinateTransformation ct(x2, y2, yaw);
+	CoordinateTransformation ct(x1, y1, yaw);
+
 	double start_x = ct.to_x(x2, y2);
 	int n = next_x_vals.size();
 
-	double target_x = DISTANCE_AHEAD;
+	double target_x = start_x + DISTANCE_AHEAD;
 	double target_distance = distance(0, 0, target_x, s(target_x));
 
-	target_velocity *= 1609.34 / 3600; // change to m/s
 	assert(target_velocity > 0);
-
 	int no_intervals = round(target_distance / DELTA_T / target_velocity);
-
-	//check jerk
-	double v_x = target_distance/(no_intervals*DELTA_T);
-	std::vector<std::vector<double>> spline_coeff = s.get_coefficients();
-	vector<double> a = spline_coeff[0];
-
-	if ( 6 * a[1] * v_x * v_x * v_x > MAX_JERK ) {
-		std::cout << "exceeds max jerk " << 6 * a[1] * v_x * v_x * v_x << "\n";
-	}
 
 	assert(no_intervals > 0);
 
@@ -177,8 +167,7 @@ Trajectory TrajectoryGenerator::build_trajectory(
 		next_d.push_back(frenet_coord[1]);
 	}
 
+	return Trajectory(next_x_vals, next_y_vals, next_s, next_d, target_velocity, target_lane, final_lane);
 
-
-	return Trajectory(next_x_vals, next_y_vals, next_s, next_d, target_velocity, target_lane);
 }
 

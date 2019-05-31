@@ -35,7 +35,7 @@ public:
 	virtual ~TrajectoryGenerator();
 
 	Trajectory build_trajectory(
-			int target_lane, double target_velocity);
+			int target_lane, int final_lane, double target_velocity);
 
 private:
 	  vector<double> map_waypoints_x;
