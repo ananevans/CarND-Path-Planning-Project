@@ -53,9 +53,9 @@ double collision_cost(Trajectory ego_trajectory, vector<vector<Prediction>> pred
 			assert( prediction->getTrajectory().getS().size() == NO_POINTS );
 			for ( int i = 0; i < NO_POINTS; i++ ) {
 				// check s-separation and d-separation
-				if ( abs( prediction->getTrajectory().getD()[i] -  ego_trajectory.getD()[i]) < 2.2 ) {
+				if ( fabs( prediction->getTrajectory().getD()[i] -  ego_trajectory.getD()[i]) < 2.2 ) {
 					// cars less than one car width apart
-					if ( abs( prediction->getTrajectory().getS()[i] -  ego_trajectory.getS()[i]) < 5 ) {
+					if ( fabs( prediction->getTrajectory().getS()[i] -  ego_trajectory.getS()[i]) < 5 ) {
 						//cars less than one car length apart
 						return 1.0;
 					}
@@ -95,7 +95,7 @@ double speed_limit_violation(Trajectory ego_trajectory, vector<vector<Prediction
 double lane_speed_match(Trajectory ego_trajectory, vector<vector<Prediction>> predictions) {
 	double lane_speed = get_lane_speed( predictions, ego_trajectory.getTargetLane(), ego_trajectory.getS().back() );
 	lane_speed = min(TARGET_SPEED, lane_speed);
-	return abs(lane_speed - ego_trajectory.getTargetSpeed())/TARGET_SPEED;
+	return fabs(lane_speed - ego_trajectory.getTargetSpeed())/TARGET_SPEED;
 }
 
 double buffer_cost(Trajectory ego_trajectory, vector<vector<Prediction>> predictions) {
@@ -143,8 +143,8 @@ double gap_cost(Trajectory ego_trajectory, vector<vector<Prediction>> prediction
 				if ( Trajectory::get_lane( vehicle_d ) == ego_trajectory.getFinalLane() ) {
 					// vehicle in final lane
 					double speed = max( ego_trajectory.getTargetSpeed(), prediction->getTrajectory().getTargetSpeed() );
-					if ( abs(vehicle_s - ego_s) < 2 * speed ) {
-						return (2 * speed - abs(vehicle_s - ego_s))/(2 * speed) ;
+					if ( fabs(vehicle_s - ego_s) < 2 * speed ) {
+						return (2 * speed - fabs(vehicle_s - ego_s))/(2 * speed) ;
 					}
 				}
 			}
@@ -159,10 +159,10 @@ double lane_crossing_cost(Trajectory ego_trajectory, vector<vector<Prediction>> 
 	int lane1 = 0;
 	vector<double> d = ego_trajectory.getD();
 	for (int i = 0; i < d.size(); i++) {
-		if ( abs( d[i] - LANE_WIDTH ) < 0.5 ) {
+		if ( fabs( d[i] - LANE_WIDTH ) < 0.5 ) {
 			lane0 += 1;
 		} else {
-			if ( abs( d[i] - 2 * LANE_WIDTH ) < 0.5 ) {
+			if ( fabs( d[i] - 2 * LANE_WIDTH ) < 0.5 ) {
 				lane1 += 1;
 			}
 		}
@@ -196,9 +196,9 @@ double inefficinecy_cost(Trajectory ego_trajectory, vector<vector<Prediction>> p
 			get_lane_speed(predictions, ego_trajectory.getTargetLane(), ego_s));
 	double final_lane_speed = min( TARGET_SPEED,
 			get_lane_speed(predictions, ego_trajectory.getFinalLane(), ego_s));
-	cout << "inefficinecy_cost target_lane_speed=" << target_lane_speed << "\n";
-	cout << "inefficinecy_cost final_lane_speed=" << final_lane_speed << "\n";
-	cout << "inefficinecy_cost TARGET_SPEED=" << TARGET_SPEED << "\n";
+//	cout << "inefficinecy_cost target_lane_speed=" << target_lane_speed << "\n";
+//	cout << "inefficinecy_cost final_lane_speed=" << final_lane_speed << "\n";
+//	cout << "inefficinecy_cost TARGET_SPEED=" << TARGET_SPEED << "\n";
 	double cost = (2.0*TARGET_SPEED - target_lane_speed - final_lane_speed)/(2.0*TARGET_SPEED);
 	return cost;
 }
@@ -255,7 +255,7 @@ double TrajectoryCostCalculator::get_cost( Trajectory ego_trajectory, vector<vec
 		double cost = (TrajectoryCostCalculator::COST_FUNCTIONS[i](ego_trajectory, predictions));
 		result += TrajectoryCostCalculator::WEIGHTS[i] * cost;
 		sum += TrajectoryCostCalculator::WEIGHTS[i];
-		cout << "Weighted cost  function " << names[i] << ": " << WEIGHTS[i] * cost << "\n";
+		//cout << "Weighted cost  function " << names[i] << ": " << WEIGHTS[i] * cost << "\n";
 	}
 	return result/sum;
 }

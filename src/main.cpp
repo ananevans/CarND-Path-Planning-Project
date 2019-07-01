@@ -120,17 +120,17 @@ int main() {
 						double s = sensor_fusion[i][5];
 						double d = sensor_fusion[i][6];
 
-						if ( d >= 0 && abs(car_s - s) < 100 ) {
+						if ( d >= 0 && fabs(car_s - s) < 100 ) {
 							vector<Prediction> predictions =  Prediction::predict(
 									x, y, vx, vy, s, d,
 									map_waypoints_x, map_waypoints_y, map_waypoints_s);
 							for (int p=0; p< predictions.size(); p++) {
-								std::cout << vehicle_id
-										<< ": probability " << predictions[p].get_probability()
-										<< " behavior  " << predictions[p].get_behavior()
-										<< " speed " << predictions[p].getTrajectory().getTargetSpeed()
-										<< " lane " << predictions[p].getTrajectory().getTargetLane()
-										<< "\n";
+//								std::cout << vehicle_id
+//										<< ": probability " << predictions[p].get_probability()
+//										<< " behavior  " << predictions[p].get_behavior()
+//										<< " speed " << predictions[p].getTrajectory().getTargetSpeed()
+//										<< " lane " << predictions[p].getTrajectory().getTargetLane()
+//										<< "\n";
 							}
 							if (predictions.size() > 0) {
 								all_predictions.push_back(predictions);
@@ -165,6 +165,7 @@ int main() {
 					ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
 				}  // end "telemetry" if
 			} else {
+				cout << "No data!!!!";
 				// Manual driving
 				std::string msg = "42[\"manual\",{}]";
 				ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);

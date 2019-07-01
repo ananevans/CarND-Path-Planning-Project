@@ -67,15 +67,15 @@ vector<vector<double>> Behavior::calculate_behavior(
 				new_speed = ego_traj->getTargetSpeed();
 				new_state = *s;
 			}
-			cout << "New min cost " << min_cost
-					<< " Trajectory cost = " << crt_cost << " "; ego_traj->debug_info();
+//			cout << "New min cost " << min_cost
+//					<< " Trajectory cost = " << crt_cost << " "; ego_traj->debug_info();
 		}
 	}
 	previous_speed = new_speed;
 	this->current_state = new_state;
-	cout << "New speed " << previous_speed
-			<< " new state " << current_state
-			<< "\n";
+//	cout << "New speed " << previous_speed
+//			<< " new state " << current_state
+//			<< "\n";
 	assert ( min_cost <= 1.0 );
 	vector<vector<double>> xy(2);
 	xy[0] = min_trajectory.getX();
